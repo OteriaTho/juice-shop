@@ -23,7 +23,7 @@ jobs:
           npm audit --json > npm-audit-report.json
 
       - name: Upload SCA report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sca-report-${{ github.run_id }}
           path: npm-audit-report.json
