@@ -2,17 +2,10 @@ name: SCA Scan
 
 on:
   push:
-    # branches:
-    #   - main
-    #   - 'release/*'
-  pull_request:
-    branches:
-      - main
 
-# test
 jobs:
   sca:
-    name: GitHub SCA / CodeQL Scan
+    name: GitHub Dependency Scan (SCA)
     runs-on: ubuntu-latest
 
     steps:
@@ -24,15 +17,13 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript
+      - name: Run npm audit for SCA
+        run: |
+          npm ci
+          npm audit --json > npm-audit-report.json
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Perform CodeQL Scan
-        uses: github/codeql-action/analyze@v3
+      - name: Upload SCA report
+        uses: actions/upload-artifact@v3
         with:
-          category: "/language:javascript"
+          name: sca-report-${{ github.run_id }}
+          path: npm-audit-report.json
