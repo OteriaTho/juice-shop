@@ -1,27 +1,58 @@
 name: SCA Scan
-
 on:
   push:
-
 jobs:
- sca:
-   name: GitHub SCA / CodeQL Scan
-   runs-on: ubuntu-latest
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
-   steps:
-     - name: Checkout repository
-       uses: actions/checkout@v3
-     - name: Set up Node.js
-       uses: actions/setup-node@v4
-       with:
-         node-version: '18'
-     - name: Initialize CodeQL
-       uses: github/codeql-action/init@v3
-       with:
-         languages: javascript
-     - name: Autobuild
-       uses: github/codeql-action/autobuild@v3
-     - name: Perform CodeQL Scan
-       uses: github/codeql-action/analyze@v3
-       with:
-         category: "/language:javascript"
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-and-quality
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Check for critical npm vulnerabilities
+      run: |
+        npm audit --audit-level=critical || (echo "❌ Vulnérabilités critiques détectées dans les packages npm" && exit 1)
+
+    - name: Build project
+      run: |
+        npm run build:frontend
+        npm run build:server
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+    - name: Check CodeQL critical vulnerabilities
+      run: |
+        critical=$(gh api repos/${{ github.repository }}/code-scanning/alerts --jq '[.[] | select(.rule.security_severity_level=="critical" or .rule.severity=="error")] | length' || echo "0")
+        if [ "$critical" -gt 0 ]; then
+          echo "❌ CodeQL a détecté $critical vulnérabilité(s) critique(s)"
+          exit 1
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
